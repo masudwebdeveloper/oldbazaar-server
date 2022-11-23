@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 const port = process.env.PORT || 5000;
 
@@ -26,11 +26,29 @@ async function run() {
             const products = await secondHandProductsCollections.find(query).toArray();
             res.send(products)
         })
+
+        //for show product details
+        app.get('/products/:id', async(req,res)=>{
+            const id = req.params.id;
+            const filter = {_id: ObjectId(id)};
+            const product = await secondHandProductsCollections.findOne(filter);
+            res.send(product);
+        })
         // get only categories
         app.get('/categories', async(req, res)=>{
             const query = {};
             const categories = await categoriesCollections.find(query).toArray();
             res.send(categories);
+        })
+
+        //get sepecific category product show
+        app.get('/categories/:id', async(req, res)=>{
+            const id = req.params.id;
+            const filter = {_id: ObjectId(id)};
+            const category = await categoriesCollections.findOne(filter);
+            const query = {category: category.category};
+            const result = await secondHandProductsCollections.find(query).toArray();
+            res.send(result);
         })
     }
     finally {
