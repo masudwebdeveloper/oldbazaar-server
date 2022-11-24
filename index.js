@@ -114,6 +114,14 @@ async function run() {
 
             
         })
+
+        //get wishlist products for email
+        app.get('/wishlist', async(req, res)=>{
+            const email = req.query.email;
+            const query = {email: email};
+            const wishlistProducts = await wishlistsCollections.find(query).toArray();
+            res.send(wishlistProducts);
+        })
     }
     finally {
 
