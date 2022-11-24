@@ -28,6 +28,12 @@ async function run() {
             res.send(products)
         })
 
+        //add to product only permision is admin
+        app.post('/products', async(req, res)=>{
+            const productInfo= req.body;
+            const addProduct = await secondHandProductsCollections.insertOne(productInfo);
+            res.send(addProduct);
+        })
         //for show product details
         app.get('/products/:id', async(req,res)=>{
             const id = req.params.id;
