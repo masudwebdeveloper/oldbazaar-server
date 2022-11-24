@@ -21,6 +21,7 @@ async function run() {
         const secondHandProductsCollections = client.db('OldBazaar').collection('Products');
         const categoriesCollections = client.db('OldBazaar').collection('categories');
         const usersCollections = client.db('OldBazaar').collection('users');
+        const wishlistsCollections = client.db('OldBazaar').collection('wishlists');
         // get all products
         app.get('/products', async (req, res) => {
             const query = {};
@@ -92,6 +93,26 @@ async function run() {
             }
             const userUpdate = await usersCollections.updateOne(filter, updateDoc, options);
             res.send(userUpdate);
+        })
+
+        //wishlist products add
+        app.post('/wishlist', async(req, res)=>{
+            const wishlist = req.body;
+            const query = {
+                email: wishlist.email,
+                productId: wishlist.productId
+            }
+            
+            const alreadyWishlist = await wishlistsCollections.find(query).toArray();
+            if(alreadyWishlist.length){
+                const message = `Already wishlist This product ${wishlist.title}`;
+                return res.send({acknowledged: false, message})
+            }
+
+            const wishlistProduct = await wishlistsCollections.insertOne(wishlist);
+            res.send(wishlistProduct)
+
+            
         })
     }
     finally {
