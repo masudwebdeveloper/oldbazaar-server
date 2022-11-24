@@ -58,6 +58,13 @@ async function run() {
             const user = await usersCollections.insertOne(query);
             res.send(user);
         })
+
+        //get all users this api
+        app.get('/users', async(req, res)=>{
+            const query = {};
+            const users = await usersCollections.find(query).toArray();
+            res.send(users);
+        })
     }
     finally {
 
