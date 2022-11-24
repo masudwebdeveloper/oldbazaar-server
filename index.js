@@ -20,6 +20,7 @@ async function run() {
     try {
         const secondHandProductsCollections = client.db('OldBazaar').collection('Products');
         const categoriesCollections = client.db('OldBazaar').collection('categories');
+        const usersCollections = client.db('OldBazaar').collection('users');
         // get all products
         app.get('/products', async (req, res) => {
             const query = {};
@@ -49,6 +50,13 @@ async function run() {
             const query = {category: category.category};
             const result = await secondHandProductsCollections.find(query).toArray();
             res.send(result);
+        })
+
+        //save users
+        app.post('/users', async(req, res)=>{
+            const query = req.body;
+            const user = await usersCollections.insertOne(query);
+            res.send(user);
         })
     }
     finally {
