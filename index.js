@@ -65,6 +65,28 @@ async function run() {
             const users = await usersCollections.find(query).toArray();
             res.send(users);
         })
+
+        //delete users only permision is admin
+        app.delete('/users/:id', async(req, res)=>{
+            const id = req.params.id;
+            const filter = {_id: ObjectId(id)};
+            const user = await usersCollections.deleteOne(filter);
+            res.send(user);
+        })
+
+        // give super power for special person so be care full
+        app.put('/users/admin/:id', async(req, res)=>{
+            const id = req.params.id;
+            const filter = {_id: ObjectId(id)};
+            const options = {upsert: true};
+            const updateDoc = {
+                $set : {
+                    role: 'admin'
+                }
+            }
+            const userUpdate = await usersCollections.updateOne(filter, updateDoc, options);
+            res.send(userUpdate);
+        })
     }
     finally {
 
