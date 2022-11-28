@@ -3,6 +3,7 @@ const cors = require('cors');
 require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const port = process.env.PORT || 5000;
 
 const app = express();
@@ -39,6 +40,7 @@ async function run() {
         const reportsCollections = client.db('OldBazaar').collection('reports');
         const bookingsCollections = client.db('OldBazaar').collection('bookings');
         const advertiseCollections = client.db('OldBazaar').collection('advertise');
+        const paymentsCollections = client.db('OldBazaar').collection('payments');
         // verify admin
         //for secrect use jwt
         app.get('/jwt', async (req, res) => {
@@ -52,10 +54,45 @@ async function run() {
             res.status(403).send({ accessToken: '' });
         })
 
+        //for payment gateway api
+        app.post('/create-payment-intent', async (req, res) => {
+            const product = req.body;
+            const price = product.price;
+            const amount = price * 100;
+            const paymentIntent = await stripe.paymentIntents.create({
+                currency: 'usd',
+                amount: amount,
+                "payment_method_types": [
+                    "card"
+                ],
+            })
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            });
+        })
+        //this is payment ar post api
+        app.post('/payment', async (req, res) => {
+            const paymentData = req.body;
+            const result = await paymentsCollections.insertOne(paymentData);
+            const id = paymentData.productId;
+            console.log(id);
+            const option = { upsert: true }
+            const filter = { productId: id };
+            const secondFilter = { _id: ObjectId(id) }
+            const updateDoc = {
+                $set: {
+                    paid: true
+                }
+            }
+            const bookingUpdate = await bookingsCollections.updateOne(filter, updateDoc, option);
+            const secondHandProductUpdate = await secondHandProductsCollections.updateOne(secondFilter, updateDoc, option);
+            res.send(result);
+        })
+
         //for client site make hooks this api users role
-        app.get('/user/role/:email', async(req, res)=>{
+        app.get('/user/role/:email', async (req, res) => {
             const email = req.params.email;
-            const query = {email: email};
+            const query = { email: email };
             const getUser = await usersCollections.findOne(query);
             res.send(getUser);
         })
@@ -66,9 +103,9 @@ async function run() {
             const size = parseInt(req.query.size);
             const page = parseInt(req.query.page);
             const query = {};
-            const products = await secondHandProductsCollections.find(query).skip(page * size).limit(size).toArray();
+            const products = await secondHandProductsCollections.find(query).sort({ _id: -1 }).skip(page * size).limit(size).toArray();
             const count = await secondHandProductsCollections.estimatedDocumentCount();
-            res.send({count,products})
+            res.send({ count, products })
         })
 
         //add to product only permision is admin
@@ -94,31 +131,31 @@ async function run() {
         })
 
         // myproducts deleted api for verified seller
-        app.delete('/myproducts/:id',verifyJWT, async(req, res)=>{
+        app.delete('/myproducts/:id', verifyJWT, async (req, res) => {
             const id = req.params.id;
-            const query = {_id: ObjectId(id)};
+            const query = { _id: ObjectId(id) };
             const deleteProduct = await secondHandProductsCollections.deleteOne(query);
             res.send(deleteProduct);
         })
         // reported product delete apu only permision is admin for secondhandproductcollections
-        app.delete('/reportproduct/:id', async(req, res)=>{
+        app.delete('/reportproduct/:id', async (req, res) => {
             const id = req.params.id;
-            const query = {_id: ObjectId(id)};
+            const query = { _id: ObjectId(id) };
             const deleteProduct = await secondHandProductsCollections.deleteOne(query);
             res.send(deleteProduct);
         })
         // reported product delete apu only permision is admin for reports collection
-        app.delete('/reportproductdelete/:id', async(req, res)=>{
+        app.delete('/reportproductdelete/:id', async (req, res) => {
             const id = req.params.id;
-            const query = {_id: ObjectId(id)};
+            const query = { _id: ObjectId(id) };
             const deleteProduct = await reportsCollections.deleteOne(query);
             res.send(deleteProduct);
         })
 
         //delete from advertise collection 
-        app.delete('/advertise/:id', async(req, res)=>{
+        app.delete('/advertise/:id', async (req, res) => {
             const id = req.params.id;
-            const filter = {productId: id};
+            const filter = { productId: id };
             const deleteProduct = await advertiseCollections.deleteOne(filter);
             res.send(deleteProduct);
         })
@@ -141,8 +178,16 @@ async function run() {
 
         //save users
         app.post('/users', async (req, res) => {
-            const query = req.body;
-            const user = await usersCollections.insertOne(query);
+            const userInfo = req.body;
+            const filter = {
+                email: userInfo.email,
+            }
+            const alreadyUser = await usersCollections.find(filter).toArray();
+            if (alreadyUser.length) {
+                const message = `Already have a user this ${userInfo.email}`
+                return res.send({ acknowledged: false, message })
+            }
+            const user = await usersCollections.insertOne(userInfo);
             res.send(user);
         })
 
@@ -218,7 +263,7 @@ async function run() {
             }
 
             const reportedProduct = await reportsCollections.insertOne(reportProduct);
-           
+
             res.send(reportedProduct)
 
 
@@ -234,14 +279,15 @@ async function run() {
         //for booking specific product api
         app.post('/bookings', async (req, res) => {
             const productData = req.body;
+            const result = await bookingsCollections.insertOne(productData);
             const query = {
                 email: productData.email,
                 productName: productData.productName
             }
-            const option = {upsert: true};
-            const filter = {productId: productData.productId};
+            const option = { upsert: true };
+            const filter = { _id: ObjectId(productData.productId) };
             const updateDoc = {
-                $set : {
+                $set: {
                     status: "booked"
                 }
             }
@@ -250,8 +296,7 @@ async function run() {
                 const message = `You already have been booked ${productData.productName}`
                 return res.send({ acknowledged: false, message })
             }
-            const result = await bookingsCollections.insertOne(productData);
-            const update = await advertiseCollections.updateOne(filter, updateDoc, option);
+            const update = await secondHandProductsCollections.updateOne(filter, updateDoc, option);
             res.send(result);
         })
 
@@ -268,30 +313,30 @@ async function run() {
 
         });
 
-        app.get('/bookings/:id', async(req, res)=>{
+        app.get('/bookings/:id', async (req, res) => {
             const id = req.params.id;
-            const query = {_id: ObjectId(id)};
+            const query = { _id: ObjectId(id) };
             const result = await bookingsCollections.findOne(query);
             res.send(result);
         })
 
         //add to advertise ment
-        app.post('/advertise', async(req, res)=>{
+        app.post('/advertise', async (req, res) => {
             const productData = req.body;
             const query = {
                 productId: productData.productId,
             }
-            const filter = {_id: ObjectId(productData.productId)};
-            const options = {upsert: true};
+            const filter = { _id: ObjectId(productData.productId) };
+            const options = { upsert: true };
             const updateDoc = {
-                $set:{
+                $set: {
                     isAdvertise: true
                 }
             }
             const alreadyAdvertise = await advertiseCollections.find(query).toArray();
-            if(alreadyAdvertise.length){
+            if (alreadyAdvertise.length) {
                 const message = 'This product already advertise is running';
-                return res.send({acknowledged: false, message})
+                return res.send({ acknowledged: false, message })
             }
             const addProduct = await advertiseCollections.insertOne(productData);
             const advertiseProduct = await secondHandProductsCollections.updateOne(filter, updateDoc, options);
@@ -299,7 +344,7 @@ async function run() {
         })
 
         //get and show ui advertise api
-        app.get('/advertise', async(req,res)=>{
+        app.get('/advertise', async (req, res) => {
             const query = {};
             const advertiseProducts = await advertiseCollections.find(query).limit(4).toArray();
             res.send(advertiseProducts);
