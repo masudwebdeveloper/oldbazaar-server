@@ -198,6 +198,20 @@ async function run() {
             res.send(users);
         })
 
+        //get all buyer only
+        app.get('/allbuyers', async(req, res)=>{
+            const query = {role: 'Buyer'};
+            const allBuyers = await usersCollections.find(query).toArray();
+            res.send(allBuyers)
+        })
+
+        //get all seller only
+        app.get('/allsellers', async(req, res)=>{
+            const query = {role: 'Seller'};
+            const allsellers = await usersCollections.find(query).toArray();
+            res.send(allsellers)
+        })
+
         //delete users only permision is admin
         app.delete('/users/:id', async (req, res) => {
             const id = req.params.id;
