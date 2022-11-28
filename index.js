@@ -42,6 +42,21 @@ async function run() {
         const advertiseCollections = client.db('OldBazaar').collection('advertise');
         const paymentsCollections = client.db('OldBazaar').collection('payments');
         // verify admin
+
+        //temporary api for all update
+        app.get('/update', async(req, res)=>{
+            const filter = {};
+            const options = {upsert: true};
+            const updateDoc = {
+                $set : {
+                    isAdvertise: false,
+                    status: 'available',
+                    paid: false
+                }
+            }
+            const result = await secondHandProductsCollections.updateMany(filter, updateDoc, options);
+            res.send(result) 
+        })
         //for secrect use jwt
         app.get('/jwt', async (req, res) => {
             const email = req.query.email;
@@ -81,10 +96,13 @@ async function run() {
             const secondFilter = { _id: ObjectId(id) }
             const updateDoc = {
                 $set: {
-                    paid: true
+                    paid: true,
+                    isAdvertise: false,
+                    status: 'sold'
                 }
             }
             const bookingUpdate = await bookingsCollections.updateOne(filter, updateDoc, option);
+            const advertiseUpdate = await advertiseCollections.updateOne(filter, updateDoc, option);
             const secondHandProductUpdate = await secondHandProductsCollections.updateOne(secondFilter, updateDoc, option);
             res.send(result);
         })
@@ -102,8 +120,8 @@ async function run() {
         app.get('/products', async (req, res) => {
             const size = parseInt(req.query.size);
             const page = parseInt(req.query.page);
-            const query = {};
-            const products = await secondHandProductsCollections.find(query).sort({ _id: -1 }).skip(page * size).limit(size).toArray();
+            const query = {paid: false};
+            const products = await secondHandProductsCollections.find(query).sort({ _id: -1 }).skip(page * size).limit(8).toArray();
             const count = await secondHandProductsCollections.estimatedDocumentCount();
             res.send({ count, products })
         })
@@ -171,7 +189,7 @@ async function run() {
             const id = req.params.id;
             const filter = { _id: ObjectId(id) };
             const category = await categoriesCollections.findOne(filter);
-            const query = { category: category.category };
+            const query = { category: category.category,paid: false };
             const result = await secondHandProductsCollections.find(query).toArray();
             res.send(result);
         })
@@ -293,10 +311,10 @@ async function run() {
         //for booking specific product api
         app.post('/bookings', async (req, res) => {
             const productData = req.body;
-            const result = await bookingsCollections.insertOne(productData);
             const query = {
                 email: productData.email,
-                productName: productData.productName
+                productName: productData.productName,
+                productId: productData.productId
             }
             const option = { upsert: true };
             const filter = { _id: ObjectId(productData.productId) };
@@ -310,6 +328,7 @@ async function run() {
                 const message = `You already have been booked ${productData.productName}`
                 return res.send({ acknowledged: false, message })
             }
+            const result = await bookingsCollections.insertOne(productData);
             const update = await secondHandProductsCollections.updateOne(filter, updateDoc, option);
             res.send(result);
         })
@@ -352,17 +371,39 @@ async function run() {
                 const message = 'This product already advertise is running';
                 return res.send({ acknowledged: false, message })
             }
-            const addProduct = await advertiseCollections.insertOne(productData);
             const advertiseProduct = await secondHandProductsCollections.updateOne(filter, updateDoc, options);
+            const addProduct = await advertiseCollections.insertOne(productData);
             res.send(addProduct);
         })
 
         //get and show ui advertise api
         app.get('/advertise', async (req, res) => {
-            const query = {};
+            const query = {isAdvertise: true};
             const advertiseProducts = await advertiseCollections.find(query).limit(4).toArray();
             res.send(advertiseProducts);
 
+        })
+
+        //admin route
+        app.get('/users/admin/:email', async(req, res)=>{
+            const email = req.params.email;
+            const query = {email: email};
+            const result = await usersCollections.findOne(query);
+            res.send({isAdmin: result.role});
+        })
+        //admin route
+        app.get('/users/seller/:email', async(req, res)=>{
+            const email = req.params.email;
+            const query = {email: email};
+            const result = await usersCollections.findOne(query);
+            res.send({isSeller: result.role});
+        })
+        //admin route
+        app.get('/users/buyer/:email', async(req, res)=>{
+            const email = req.params.email;
+            const query = {email: email};
+            const result = await usersCollections.findOne(query);
+            res.send({isBuyer: result.role});
         })
     }
     finally {
