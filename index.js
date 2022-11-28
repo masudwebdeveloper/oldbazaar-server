@@ -210,7 +210,7 @@ async function run() {
         })
 
         //get all users this api
-        app.get('/users', async (req, res) => {
+        app.get('/users',verifyJWT, async (req, res) => {
             const query = {};
             const users = await usersCollections.find(query).toArray();
             res.send(users);
@@ -389,21 +389,21 @@ async function run() {
             const email = req.params.email;
             const query = {email: email};
             const result = await usersCollections.findOne(query);
-            res.send({isAdmin: result.role});
+            res.send({isAdmin: result?.role});
         })
         //admin route
         app.get('/users/seller/:email', async(req, res)=>{
             const email = req.params.email;
             const query = {email: email};
             const result = await usersCollections.findOne(query);
-            res.send({isSeller: result.role});
+            res.send({isSeller: result?.role});
         })
         //admin route
         app.get('/users/buyer/:email', async(req, res)=>{
             const email = req.params.email;
             const query = {email: email};
             const result = await usersCollections.findOne(query);
-            res.send({isBuyer: result.role});
+            res.send({isBuyer: result?.role});
         })
     }
     finally {
