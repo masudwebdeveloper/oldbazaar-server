@@ -217,7 +217,7 @@ async function run() {
         })
 
         //get all buyer only
-        app.get('/allbuyers', async(req, res)=>{
+        app.get('/allbuyers',verifyJWT, async(req, res)=>{
             const query = {role: 'Buyer'};
             const allBuyers = await usersCollections.find(query).toArray();
             res.send(allBuyers)
@@ -354,7 +354,7 @@ async function run() {
         })
 
         //add to advertise ment
-        app.post('/advertise', async (req, res) => {
+        app.post('/advertise',verifyJWT, async (req, res) => {
             const productData = req.body;
             const query = {
                 productId: productData.productId,
